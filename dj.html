@@ -7,28 +7,28 @@
 <title>DJ – Musikwünsche</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background: #fff; color: #000; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background: #EEF3FB; color: #1E2A5A; }
   main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
   header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   h1 { font-size: 28px; margin: 8px 0; letter-spacing: -0.02em; }
-  .meta { font-size: 13px; color: #666; }
+  .meta { font-size: 13px; color: #5B6684; }
   .event { display: flex; gap: 8px; margin-top: 12px; }
-  .event select { flex: 1; min-width: 0; font: inherit; font-size: 17px; font-weight: 600; padding: 10px; border: 2px solid #000; border-radius: 0; background: #fff; color: #000; }
-  .event button { font: inherit; font-size: 18px; padding: 0 14px; flex: none; border: 2px solid #000; background: #fff; color: #000; cursor: pointer; }
-  .tabs { display: flex; margin: 12px 0 16px; border: 2px solid #000; }
-  .tabs button { flex: 1; padding: 10px; font: inherit; font-weight: 600; background: #fff; color: #000; border: 0; cursor: pointer; }
-  .tabs button + button { border-left: 2px solid #000; }
-  .tabs button.on { background: #000; color: #fff; }
+  .event select { flex: 1; min-width: 0; font: inherit; font-size: 17px; font-weight: 600; padding: 10px; border: 2px solid #1E2A5A; border-radius: 0; background: #fff; color: #1E2A5A; }
+  .event button { font: inherit; font-size: 18px; padding: 0 14px; flex: none; border: 2px solid #1E2A5A; background: #fff; color: #1E2A5A; cursor: pointer; }
+  .tabs { display: flex; margin: 12px 0 16px; border: 2px solid #1E2A5A; }
+  .tabs button { flex: 1; padding: 10px; font: inherit; font-weight: 600; background: #fff; color: #1E2A5A; border: 0; cursor: pointer; }
+  .tabs button + button { border-left: 2px solid #1E2A5A; }
+  .tabs button.on { background: #1E2A5A; color: #fff; }
   ul { list-style: none; margin: 0; padding: 0; }
-  li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid #ddd; }
+  li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid #D3DCEC; }
   li.played .txt { opacity: .4; }
   li.played .song { text-decoration: line-through; }
-  input[type=checkbox] { width: 28px; height: 28px; margin: 2px 0 0; accent-color: #000; flex: none; cursor: pointer; }
+  input[type=checkbox] { width: 28px; height: 28px; margin: 2px 0 0; accent-color: #1E2A5A; flex: none; cursor: pointer; }
   .song { font-size: 18px; font-weight: 700; }
   .artist { font-size: 16px; }
-  .note { font-size: 14px; color: #444; margin-top: 4px; font-style: italic; }
-  .time { font-size: 12px; color: #888; margin-top: 4px; }
-  .empty, .msg { text-align: center; color: #666; padding: 48px 0; }
+  .note { font-size: 14px; color: #3D4970; margin-top: 4px; font-style: italic; }
+  .time { font-size: 12px; color: #7A84A0; margin-top: 4px; }
+  .empty, .msg { text-align: center; color: #5B6684; padding: 48px 0; }
   .msg.bad { color: #b00; }
 </style>
 </head>
@@ -93,10 +93,9 @@ function renderEvents() {
     const upcoming = events.filter(e => e.event_date >= today).sort((a, b) => a.event_date < b.event_date ? -1 : 1)[0];
     current = (upcoming || events[0] || {}).event_date || null;
   }
-  sel.innerHTML = events.map(e => {
-    const n = rows.filter(r => r.event_date === e.event_date).length;
-    return `<option value="${e.event_date}" ${e.event_date === current ? "selected" : ""}>${esc(e.name)} – ${fmtDate(e.event_date)} (${n})</option>`;
-  }).join("");
+  sel.innerHTML = events.map(e =>
+    `<option value="${e.event_date}" ${e.event_date === current ? "selected" : ""}>${esc(e.name)}</option>`
+  ).join("");
 }
 sel.onchange = () => { current = sel.value; render(); };
 

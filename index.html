@@ -6,25 +6,25 @@
 <title>Musikwünsche</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background: #fff; color: #000; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background: #EEF3FB; color: #1E2A5A; }
   main { max-width: 480px; margin: 0 auto; padding: 24px 20px 48px; }
   .lang { display: flex; justify-content: flex-end; gap: 4px; }
-  .lang button { background: none; border: 1px solid #000; padding: 6px 10px; font-size: 13px; cursor: pointer; color: #000; }
-  .lang button.on { background: #000; color: #fff; }
+  .lang button { background: #fff; border: 1px solid #1E2A5A; padding: 6px 10px; font-size: 13px; cursor: pointer; color: #1E2A5A; }
+  .lang button.on { background: #1E2A5A; color: #fff; }
   h1 { font-size: 40px; line-height: 1.05; margin: 32px 0 8px; letter-spacing: -0.02em; }
-  p.sub { margin: 0 0 32px; color: #555; font-size: 16px; }
+  p.sub { margin: 0 0 32px; color: #5B6684; font-size: 16px; }
   label { display: block; font-weight: 600; font-size: 14px; margin: 20px 0 6px; }
-  label span { font-weight: 400; color: #777; }
-  input, textarea { width: 100%; font: inherit; font-size: 17px; padding: 14px; border: 2px solid #000; border-radius: 0; background: #fff; color: #000; }
+  label span { font-weight: 400; color: #7A84A0; }
+  input, textarea { width: 100%; font: inherit; font-size: 17px; padding: 14px; border: 2px solid #1E2A5A; border-radius: 0; background: #fff; color: #1E2A5A; }
   textarea { min-height: 90px; resize: vertical; }
-  input:focus, textarea:focus { outline: none; border-color: #000; box-shadow: 4px 4px 0 #000; }
+  input:focus, textarea:focus { outline: none; border-color: #1E2A5A; box-shadow: 4px 4px 0 #FF8A65; }
   .hp { position: absolute; left: -9999px; }
-  button.send { width: 100%; margin-top: 28px; padding: 16px; font-size: 18px; font-weight: 700; background: #000; color: #fff; border: 2px solid #000; cursor: pointer; }
+  button.send { width: 100%; margin-top: 28px; padding: 16px; font-size: 18px; font-weight: 700; background: #1E2A5A; color: #fff; border: 2px solid #1E2A5A; cursor: pointer; }
   button.send:disabled { opacity: .5; }
   .err { color: #b00; margin-top: 12px; font-size: 14px; min-height: 1em; }
   .done { display: none; text-align: center; margin-top: 64px; }
-  .done .big { font-size: 64px; }
-  .done button { margin-top: 24px; background: #fff; color: #000; }
+  .done .big { font-size: 64px; color: #FF8A65; }
+  .done button { margin-top: 24px; background: #fff; color: #1E2A5A; }
 </style>
 </head>
 <body>
@@ -38,13 +38,13 @@
     <h1 data-t="title"></h1>
     <p class="sub" data-t="sub"></p>
 
-    <label for="song"><span data-t="song" style="color:#000;font-weight:600"></span> *</label>
+    <label for="song"><span data-t="song" style="color:#1E2A5A;font-weight:600"></span> *</label>
     <input id="song" name="song" maxlength="200" required autocomplete="off">
 
-    <label for="artist"><span data-t="artist" style="color:#000;font-weight:600"></span> *</label>
+    <label for="artist"><span data-t="artist" style="color:#1E2A5A;font-weight:600"></span> *</label>
     <input id="artist" name="artist" maxlength="200" required autocomplete="off">
 
-    <label for="note"><span data-t="note" style="color:#000;font-weight:600"></span> <span data-t="optional"></span></label>
+    <label for="note"><span data-t="note" style="color:#1E2A5A;font-weight:600"></span> <span data-t="optional"></span></label>
     <textarea id="note" name="note" maxlength="500"></textarea>
 
     <input class="hp" id="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
