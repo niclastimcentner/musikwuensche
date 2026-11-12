@@ -61,7 +61,7 @@
 <div id="home">
   <div class="wall" id="wall" aria-hidden="true"></div>
   <div class="shade"></div>
-  <div class="center"><a class="spin" href="#liste"><span class="disc"></span>Spin it, babe</a></div>
+  <div class="center"><a class="spin" href="#liste"><span class="disc"></span>Spin it, babe!</a></div>
 </div>
 <main>
   <header>
@@ -90,14 +90,17 @@
 const PHOTOS = ["fotos/dj1.jpg", "fotos/bademantel1.jpg", "fotos/dj3.jpg", "fotos/park.jpg", "fotos/dj7.jpg", "fotos/balkon.jpg", "fotos/dj4.jpg", "fotos/bademantel2.jpg", "fotos/dj2.jpg", "fotos/dj5.jpg", "fotos/dj6.jpg"];
 const home = document.getElementById("home"), wall = document.getElementById("wall");
 function buildWall() {
-  const w = innerWidth, h = innerHeight;
-  const cols = w < 600 ? 3 : w < 1100 ? 5 : 7;
+  const w = innerWidth, h = innerHeight, n = PHOTOS.length;
+  // So viele Spalten, dass alle Fotos komplett auf den Bildschirm passen
+  let cols = w < 600 ? 2 : 3;
+  while (Math.floor(h / (w / cols)) * cols < n) cols++;
   wall.style.setProperty("--cols", cols);
-  const rows = Math.ceil(h / (w / cols)) + 1;
+  const rows = Math.ceil(h / (w / cols));
   wall.innerHTML = "";
   for (let i = 0; i < cols * rows; i++) {
     const d = document.createElement("div");
-    d.style.backgroundImage = `url("${PHOTOS[(i % cols + Math.floor(i / cols)) % PHOTOS.length]}")`;
+    // Erst jedes Foto einmal, danach füllen Wiederholungen die Ränder auf
+    d.style.backgroundImage = `url("${PHOTOS[i % n]}")`;
     wall.appendChild(d);
   }
 }
