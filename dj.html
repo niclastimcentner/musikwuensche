@@ -39,12 +39,36 @@
   ul:empty { display: none; }
   .empty, .msg { text-align: center; color: var(--dim); padding: 48px 0; font-size: 14px; }
   .msg.bad { color: #ff5a4f; }
+  /* Foto-Startseite */
+  #home { position: fixed; inset: 0; z-index: 10; background: #0b0b0c; overflow: hidden; }
+  #home[hidden] { display: none; }
+  .wall { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); grid-auto-rows: calc(100vw / var(--cols, 3)); gap: 2px; }
+  .wall div { background: #161718 center / cover no-repeat; }
+  .shade { position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(0,0,0,.25) 0%, rgba(0,0,0,.7) 75%); }
+  .center { position: absolute; inset: 0; display: grid; place-items: center; }
+  a.spin { display: inline-flex; align-items: center; gap: 14px; padding: 18px 30px 18px 18px; background: var(--acc); color: #fff; text-decoration: none; font-size: 20px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; box-shadow: 0 10px 40px rgba(45,155,255,.45), 0 0 0 6px rgba(255,255,255,.12); }
+  a.spin:active { transform: scale(.97); }
+  .disc { width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle, var(--acc) 0 18%, #0b0b0c 19% 22%, #222 23% 100%); box-shadow: inset 0 0 0 2px #333; animation: rot 2.4s linear infinite; position: relative; }
+  .disc::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .disc { animation: none; } }
+  .homebtn { display: inline-grid; place-items: center; width: 34px; height: 34px; margin-right: 10px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--dim); text-decoration: none; vertical-align: middle; }
+  .homebtn svg { width: 18px; height: 18px; }
+  .brand { display: flex; align-items: center; }
 </style>
 </head>
 <body>
+<div id="home">
+  <div class="wall" id="wall" aria-hidden="true"></div>
+  <div class="shade"></div>
+  <div class="center"><a class="spin" href="#liste"><span class="disc"></span>Spin it, babe</a></div>
+</div>
 <main>
   <header>
-    <h1>Musikwünsche</h1>
+    <div class="brand">
+      <a class="homebtn" href="#" id="homebtn" title="Zu den Fotos" aria-label="Zu den Fotos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg></a>
+      <h1>Musikwünsche</h1>
+    </div>
     <div class="meta" id="meta"></div>
   </header>
   <div class="event">
@@ -61,6 +85,28 @@
   <div class="msg" id="msg">Lädt …</div>
 </main>
 
+<script>
+// Foto-Startseite
+const PHOTOS = ["fotos/dj1.jpg", "fotos/dj3.jpg", "fotos/schwerin.jpg", "fotos/dj4.jpg", "fotos/dj2.jpg", "fotos/dj5.jpg", "fotos/dj6.jpg"];
+const home = document.getElementById("home"), wall = document.getElementById("wall");
+function buildWall() {
+  const w = innerWidth, h = innerHeight;
+  const cols = w < 600 ? 3 : w < 1100 ? 5 : 7;
+  wall.style.setProperty("--cols", cols);
+  const rows = Math.ceil(h / (w / cols)) + 1;
+  wall.innerHTML = "";
+  for (let i = 0; i < cols * rows; i++) {
+    const d = document.createElement("div");
+    d.style.backgroundImage = `url("${PHOTOS[(i % cols + Math.floor(i / cols)) % PHOTOS.length]}")`;
+    wall.appendChild(d);
+  }
+}
+function route() { home.hidden = location.hash === "#liste"; }
+document.getElementById("homebtn").onclick = (e) => { e.preventDefault(); location.hash = ""; route(); scrollTo(0, 0); };
+addEventListener("hashchange", route);
+addEventListener("resize", buildWall);
+buildWall(); route();
+</script>
 <script>
 const SUPABASE_URL = "https://defcfwoxjspomkrfarpd.supabase.co";
 const SUPABASE_KEY = "sb_publishable_DFW0nw2uSWbRvTqVZkz-Xw_wSHDvk7k";

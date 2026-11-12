@@ -7,47 +7,121 @@
 <title>Musikwünsche</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #0b0b0c; overflow: hidden; font-family: "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
-  .wall { position: fixed; inset: 0; display: grid; grid-template-columns: repeat(var(--cols, 3), 1fr); grid-auto-rows: calc(100vw / var(--cols, 3)); gap: 2px; }
-  .wall div { background: #161718 center / cover no-repeat; }
-  .shade { position: fixed; inset: 0; background: radial-gradient(circle at center, rgba(0,0,0,.25) 0%, rgba(0,0,0,.7) 75%); }
-  .center { position: fixed; inset: 0; display: grid; place-items: center; }
-  a.spin { display: inline-flex; align-items: center; gap: 14px; padding: 18px 30px 18px 18px; background: #2d9bff; color: #fff; text-decoration: none; font-size: 20px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; border-radius: 999px; box-shadow: 0 10px 40px rgba(45,155,255,.45), 0 0 0 6px rgba(255,255,255,.12); }
-  a.spin:active { transform: scale(.97); }
-  .disc { width: 38px; height: 38px; border-radius: 50%; background: radial-gradient(circle, #2d9bff 0 18%, #0b0b0c 19% 22%, #222 23% 100%); box-shadow: inset 0 0 0 2px #333; animation: rot 2.4s linear infinite; position: relative; }
-  .disc::after { content: ""; position: absolute; inset: 6px; border-radius: 50%; border: 1px solid rgba(255,255,255,.12); }
-  @keyframes rot { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .disc { animation: none; } }
+  :root { --bg:#0b0b0c; --panel:#161718; --line:#2a2b2e; --text:#e9e9ea; --dim:#8b8d92; --acc:#2d9bff; }
+  body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+  main { max-width: 480px; margin: 0 auto; padding: 20px 20px 48px; }
+  .lang { display: flex; justify-content: flex-end; gap: 4px; }
+  .lang button { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 10px 14px; font-size: 12px; font-weight: 700; letter-spacing: .08em; cursor: pointer; color: var(--dim); }
+  .lang button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+  h1 { font-size: 38px; line-height: 1.05; margin: 14px 0 8px; letter-spacing: -0.01em; }
+  p.sub { margin: 0 0 28px; color: var(--dim); font-size: 16px; }
+  .eq { display: flex; gap: 3px; align-items: flex-end; height: 18px; margin-top: 28px; }
+  .eq i { width: 4px; background: var(--acc); border-radius: 1px; animation: eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -.3s } .eq i:nth-child(3) { animation-delay: -.6s } .eq i:nth-child(4) { animation-delay: -.15s } .eq i:nth-child(5) { animation-delay: -.45s }
+  @keyframes eq { 0%,100% { height: 25% } 50% { height: 100% } }
+  @media (prefers-reduced-motion: reduce) { .eq i { animation: none; height: 60%; } }
+  label { display: block; font-weight: 700; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #fff; margin: 20px 0 6px; }
+  label .opt { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--dim); }
+  input, textarea { width: 100%; font: inherit; font-size: 17px; padding: 14px; border: 1px solid #fff; border-radius: 3px; background: #fff; color: #000; }
+  textarea { min-height: 90px; resize: vertical; }
+  input:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px rgba(45,155,255,.25); }
+  .hp { position: absolute; left: -9999px; }
+  button.send { width: 100%; margin-top: 28px; padding: 16px; font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: var(--acc); color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+  button.send:disabled { opacity: .5; }
+  .err { color: #ff5a4f; margin-top: 12px; font-size: 14px; min-height: 1em; }
+  .done { display: none; text-align: center; margin-top: 64px; }
+  .done .big { font-size: 64px; color: var(--acc); }
+  .done button.send { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
 </style>
 </head>
 <body>
-<div class="wall" id="wall" aria-hidden="true"></div>
-<div class="shade"></div>
-<div class="center">
-  <a class="spin" href="wunsch.html"><span class="disc"></span>Spin it, babe</a>
-</div>
-<script>
-// Fotos im Ordner "fotos/" ablegen und hier eintragen (quadratisch, 1:1)
-const PHOTOS = ["fotos/dj1.jpg", "fotos/dj3.jpg", "fotos/schwerin.jpg", "fotos/dj4.jpg", "fotos/dj2.jpg", "fotos/dj5.jpg", "fotos/dj6.jpg"];
+<main>
+  <div class="lang">
+    <button type="button" data-l="de" class="on">DE</button>
+    <button type="button" data-l="en">EN</button>
+  </div>
 
-const wall = document.getElementById("wall");
-function build() {
-  const w = innerWidth, h = innerHeight;
-  const cols = PHOTOS.length === 1 ? 1 : (w < 600 ? 3 : w < 1100 ? 5 : 7);
-  wall.style.setProperty("--cols", cols);
-  const tile = w / cols, rows = Math.ceil(h / tile) + 1;
-  // Bei genau einem Foto: Vollbild statt Kacheln
-  if (PHOTOS.length === 1) { wall.style.gridAutoRows = "100vh"; }
-  wall.innerHTML = "";
-  for (let i = 0; i < cols * (PHOTOS.length === 1 ? 1 : rows); i++) {
-    const d = document.createElement("div");
-    // Versatz pro Zeile, damit gleiche Fotos nicht untereinander stehen
-    if (PHOTOS.length) d.style.backgroundImage = `url("${PHOTOS[(i % cols + Math.floor(i / cols)) % PHOTOS.length]}")`;
-    wall.appendChild(d);
-  }
+  <form id="f" novalidate>
+    <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <h1 data-t="title"></h1>
+    <p class="sub" data-t="sub"></p>
+
+    <label for="song"><span data-t="song"></span> *</label>
+    <input id="song" name="song" maxlength="200" required autocomplete="off">
+
+    <label for="artist"><span data-t="artist"></span> *</label>
+    <input id="artist" name="artist" maxlength="200" required autocomplete="off">
+
+    <label for="note"><span data-t="note"></span> <span class="opt" data-t="optional"></span></label>
+    <textarea id="note" name="note" maxlength="500"></textarea>
+
+    <input class="hp" id="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <button class="send" id="send" type="submit" data-t="send"></button>
+    <div class="err" id="err"></div>
+  </form>
+
+  <div class="done" id="done">
+    <div class="big">✓</div>
+    <h1 data-t="thanks"></h1>
+    <p class="sub" data-t="thanksSub"></p>
+    <button class="send" id="again" type="button" data-t="again"></button>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://defcfwoxjspomkrfarpd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_DFW0nw2uSWbRvTqVZkz-Xw_wSHDvk7k";
+
+const T = {
+  de: { title: "Musikwünsche?", sub: "Sag uns, was du hören willst.", song: "Song", artist: "Künstler / Band",
+        note: "Anmerkung", optional: "(optional)", send: "Wunsch abschicken", sending: "Wird gesendet …",
+        missing: "Bitte Song und Künstler ausfüllen.", fail: "Hat nicht geklappt. Bitte nochmal versuchen.",
+        thanks: "Danke!", thanksSub: "Dein Wunsch ist beim DJ angekommen.", again: "Noch ein Wunsch" },
+  en: { title: "Song requests?", sub: "Tell us what you want to hear.", song: "Song", artist: "Artist / Band",
+        note: "Note", optional: "(optional)", send: "Send request", sending: "Sending …",
+        missing: "Please fill in song and artist.", fail: "Something went wrong. Please try again.",
+        thanks: "Thanks!", thanksSub: "Your request reached the DJ.", again: "Another request" }
+};
+let lang = "de";
+try { if (localStorage.getItem("lang") === "en") lang = "en"; } catch (e) {}
+
+function render() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = T[lang][el.dataset.t]);
+  document.querySelectorAll(".lang button").forEach(b => b.classList.toggle("on", b.dataset.l === lang));
+  document.title = T[lang].title;
 }
-build();
-addEventListener("resize", build);
+document.querySelectorAll(".lang button").forEach(b => b.onclick = () => {
+  lang = b.dataset.l; try { localStorage.setItem("lang", lang); } catch (e) {} render();
+});
+render();
+
+const f = document.getElementById("f"), send = document.getElementById("send"), err = document.getElementById("err");
+f.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  err.textContent = "";
+  const song = f.song.value.trim(), artist = f.artist.value.trim(), note = f.note.value.trim();
+  if (f.website.value) return; // Spam-Bot
+  if (!song || !artist) { err.textContent = T[lang].missing; return; }
+  send.disabled = true; send.textContent = T[lang].sending;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/requests", {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({ song, artist, note: note || null })
+    });
+    if (!r.ok) throw new Error(r.status);
+    f.reset(); f.style.display = "none"; document.getElementById("done").style.display = "block";
+  } catch (x) {
+    err.textContent = T[lang].fail;
+  } finally {
+    send.disabled = false; send.textContent = T[lang].send;
+  }
+});
+document.getElementById("again").onclick = () => {
+  document.getElementById("done").style.display = "none"; f.style.display = "block"; f.song.focus();
+};
 </script>
 </body>
 </html>
