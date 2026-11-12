@@ -80,7 +80,7 @@
     <button data-f="played">Gespielt</button>
     <button data-f="all">Alle</button>
   </div>
-  <div class="cols"><span>✓</span><span>Titel / Künstler</span><span>Zeit</span></div>
+  <div class="cols"><span>✓</span><span>Titel / Künstler</span><span title="Wann der Wunsch reinkam">Wunsch</span></div>
   <ul id="list"></ul>
   <div class="msg" id="msg">Lädt …</div>
 </main>
@@ -177,7 +177,7 @@ function render() {
         <div class="artist">${esc(r.artist)}</div>
         ${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}
       </div>
-      <div class="time">${hhmm(r.created_at)}${r.played && r.played_at ? `<small>▶ ${hhmm(r.played_at)}</small>` : ""}</div>
+      <div class="time">${hhmm(r.created_at)}${r.played && r.played_at && hhmm(r.played_at) !== hhmm(r.created_at) ? `<small title="Gespielt um">gespielt ${hhmm(r.played_at)}</small>` : ""}</div>
     </li>`).join("");
   document.querySelector(".cols").style.display = shown.length ? "" : "none";
   msg.className = "msg";
