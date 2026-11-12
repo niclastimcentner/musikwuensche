@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>DJ – Musikwünsche</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background: #fff; color: #000; }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 28px; margin: 8px 0; letter-spacing: -0.02em; }
+  .meta { font-size: 13px; color: #666; }
+  .tabs { display: flex; margin: 16px 0; border: 2px solid #000; }
+  .tabs button { flex: 1; padding: 10px; font: inherit; font-weight: 600; background: #fff; color: #000; border: 0; cursor: pointer; }
+  .tabs button + button { border-left: 2px solid #000; }
+  .tabs button.on { background: #000; color: #fff; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid #ddd; }
+  li.played .txt { opacity: .4; }
+  li.played .song { text-decoration: line-through; }
+  input[type=checkbox] { width: 28px; height: 28px; margin: 2px 0 0; accent-color: #000; flex: none; cursor: pointer; }
+  .song { font-size: 18px; font-weight: 700; }
+  .artist { font-size: 16px; }
+  .note { font-size: 14px; color: #444; margin-top: 4px; font-style: italic; }
+  .time { font-size: 12px; color: #888; margin-top: 4px; }
+  .empty, .msg { text-align: center; color: #666; padding: 48px 0; }
+  .msg.bad { color: #b00; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Musikwünsche</h1>
+    <div class="meta" id="meta"></div>
+  </header>
+  <div class="tabs">
+    <button data-f="open" class="on">Offen</button>
+    <button data-f="played">Gespielt</button>
+    <button data-f="all">Alle</button>
+  </div>
+  <ul id="list"></ul>
+  <div class="msg" id="msg">Lädt …</div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://defcfwoxjspomkrfarpd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_DFW0nw2uSWbRvTqVZkz-Xw_wSHDvk7k";
+
+let token = new URLSearchParams(location.search).get("k");
+try {
+  if (token) localStorage.setItem("djtoken", token);
+  else token = localStorage.getItem("djtoken");
+} catch (e) {}
+
+let rows = [], filter = "open", busy = false;
+const list = document.getElementById("list"), msg = document.getElementById("msg"), meta = document.getElementById("meta");
+
+async function rpc(fn, body) {
+  const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + fn, {
+    method: "POST",
+    headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) { const e = new Error("HTTP " + r.status); e.status = r.status; throw e; }
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function hhmm(d) { return new Date(d).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }); }
+
+function render() {
+  const open = rows.filter(r => !r.played).length;
+  meta.textContent = open + " offen · " + (rows.length - open) + " gespielt";
+  const shown = rows.filter(r => filter === "all" || (filter === "open" ? !r.played : r.played));
+  list.innerHTML = shown.map(r => `
+    <li class="${r.played ? "played" : ""}">
+      <input type="checkbox" data-id="${r.id}" ${r.played ? "checked" : ""} aria-label="Gespielt">
+      <div class="txt">
+        <div class="song">${esc(r.song)}</div>
+        <div class="artist">${esc(r.artist)}</div>
+        ${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}
+        <div class="time">${hhmm(r.created_at)}${r.played && r.played_at ? " · gespielt " + hhmm(r.played_at) : ""}</div>
+      </div>
+    </li>`).join("");
+  msg.className = "msg";
+  msg.textContent = shown.length ? "" : (filter === "played" ? "Noch nichts gespielt." : "Keine Wünsche.");
+  msg.style.display = shown.length ? "none" : "block";
+}
+
+async function load() {
+  if (busy) return;
+  try {
+    rows = await rpc("dj_list", { token });
+    render();
+  } catch (e) {
+    msg.style.display = "block"; msg.className = "msg bad";
+    msg.textContent = e.status === 400 ? "Ungültiger Link." : "Keine Verbindung – versuche es gleich wieder …";
+  }
+}
+
+list.addEventListener("change", async (e) => {
+  if (e.target.type !== "checkbox") return;
+  const id = Number(e.target.dataset.id), played = e.target.checked;
+  const row = rows.find(r => r.id === id);
+  busy = true;
+  row.played = played; row.played_at = played ? new Date().toISOString() : null; render();
+  try { await rpc("dj_set_played", { token, request_id: id, is_played: played }); }
+  catch (x) { row.played = !played; render(); alert("Speichern fehlgeschlagen."); }
+  busy = false;
+});
+
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
+  filter = b.dataset.f;
+  document.querySelectorAll(".tabs button").forEach(x => x.classList.toggle("on", x === b));
+  render();
+});
+
+if (!token) { msg.className = "msg bad"; msg.textContent = "Dieser Link ist unvollständig."; }
+else { load(); setInterval(load, 10000); }
+</script>
+</body>
+</html>
