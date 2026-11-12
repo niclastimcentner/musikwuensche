@@ -6,25 +6,31 @@
 <title>Musikwünsche</title>
 <style>
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; background: #EEF3FB; color: #1E2A5A; }
-  main { max-width: 480px; margin: 0 auto; padding: 24px 20px 48px; }
+  :root { --bg:#0b0b0c; --panel:#161718; --line:#2a2b2e; --text:#e9e9ea; --dim:#8b8d92; --acc:#2d9bff; }
+  body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+  main { max-width: 480px; margin: 0 auto; padding: 20px 20px 48px; }
   .lang { display: flex; justify-content: flex-end; gap: 4px; }
-  .lang button { background: #fff; border: 1px solid #1E2A5A; padding: 6px 10px; font-size: 13px; cursor: pointer; color: #1E2A5A; }
-  .lang button.on { background: #1E2A5A; color: #fff; }
-  h1 { font-size: 40px; line-height: 1.05; margin: 32px 0 8px; letter-spacing: -0.02em; }
-  p.sub { margin: 0 0 32px; color: #5B6684; font-size: 16px; }
-  label { display: block; font-weight: 600; font-size: 14px; margin: 20px 0 6px; }
-  label span { font-weight: 400; color: #7A84A0; }
-  input, textarea { width: 100%; font: inherit; font-size: 17px; padding: 14px; border: 2px solid #1E2A5A; border-radius: 0; background: #fff; color: #1E2A5A; }
+  .lang button { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 6px 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; cursor: pointer; color: var(--dim); }
+  .lang button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+  h1 { font-size: 38px; line-height: 1.05; margin: 14px 0 8px; letter-spacing: -0.01em; }
+  p.sub { margin: 0 0 28px; color: var(--dim); font-size: 16px; }
+  .eq { display: flex; gap: 3px; align-items: flex-end; height: 18px; margin-top: 28px; }
+  .eq i { width: 4px; background: var(--acc); border-radius: 1px; animation: eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -.3s } .eq i:nth-child(3) { animation-delay: -.6s } .eq i:nth-child(4) { animation-delay: -.15s } .eq i:nth-child(5) { animation-delay: -.45s }
+  @keyframes eq { 0%,100% { height: 25% } 50% { height: 100% } }
+  @media (prefers-reduced-motion: reduce) { .eq i { animation: none; height: 60%; } }
+  label { display: block; font-weight: 700; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 20px 0 6px; }
+  label .opt { font-weight: 400; text-transform: none; letter-spacing: 0; color: #5d5f64; }
+  input, textarea { width: 100%; font: inherit; font-size: 17px; padding: 14px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--text); }
   textarea { min-height: 90px; resize: vertical; }
-  input:focus, textarea:focus { outline: none; border-color: #1E2A5A; box-shadow: 4px 4px 0 #FF8A65; }
+  input:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px rgba(45,155,255,.25); }
   .hp { position: absolute; left: -9999px; }
-  button.send { width: 100%; margin-top: 28px; padding: 16px; font-size: 18px; font-weight: 700; background: #1E2A5A; color: #fff; border: 2px solid #1E2A5A; cursor: pointer; }
+  button.send { width: 100%; margin-top: 28px; padding: 16px; font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: var(--acc); color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
   button.send:disabled { opacity: .5; }
-  .err { color: #b00; margin-top: 12px; font-size: 14px; min-height: 1em; }
+  .err { color: #ff5a4f; margin-top: 12px; font-size: 14px; min-height: 1em; }
   .done { display: none; text-align: center; margin-top: 64px; }
-  .done .big { font-size: 64px; color: #FF8A65; }
-  .done button { margin-top: 24px; background: #fff; color: #1E2A5A; }
+  .done .big { font-size: 64px; color: var(--acc); }
+  .done button.send { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
 </style>
 </head>
 <body>
@@ -35,16 +41,17 @@
   </div>
 
   <form id="f" novalidate>
+    <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     <h1 data-t="title"></h1>
     <p class="sub" data-t="sub"></p>
 
-    <label for="song"><span data-t="song" style="color:#1E2A5A;font-weight:600"></span> *</label>
+    <label for="song"><span data-t="song"></span> *</label>
     <input id="song" name="song" maxlength="200" required autocomplete="off">
 
-    <label for="artist"><span data-t="artist" style="color:#1E2A5A;font-weight:600"></span> *</label>
+    <label for="artist"><span data-t="artist"></span> *</label>
     <input id="artist" name="artist" maxlength="200" required autocomplete="off">
 
-    <label for="note"><span data-t="note" style="color:#1E2A5A;font-weight:600"></span> <span data-t="optional"></span></label>
+    <label for="note"><span data-t="note"></span> <span class="opt" data-t="optional"></span></label>
     <textarea id="note" name="note" maxlength="500"></textarea>
 
     <input class="hp" id="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
