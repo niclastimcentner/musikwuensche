@@ -12,7 +12,10 @@
   header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   h1 { font-size: 28px; margin: 8px 0; letter-spacing: -0.02em; }
   .meta { font-size: 13px; color: #666; }
-  .tabs { display: flex; margin: 16px 0; border: 2px solid #000; }
+  .event { display: flex; gap: 8px; margin-top: 12px; }
+  .event select { flex: 1; min-width: 0; font: inherit; font-size: 17px; font-weight: 600; padding: 10px; border: 2px solid #000; border-radius: 0; background: #fff; color: #000; }
+  .event button { font: inherit; font-size: 18px; padding: 0 14px; flex: none; border: 2px solid #000; background: #fff; color: #000; cursor: pointer; }
+  .tabs { display: flex; margin: 12px 0 16px; border: 2px solid #000; }
   .tabs button { flex: 1; padding: 10px; font: inherit; font-weight: 600; background: #fff; color: #000; border: 0; cursor: pointer; }
   .tabs button + button { border-left: 2px solid #000; }
   .tabs button.on { background: #000; color: #fff; }
@@ -35,6 +38,10 @@
     <h1>Musikwünsche</h1>
     <div class="meta" id="meta"></div>
   </header>
+  <div class="event">
+    <select id="event" aria-label="Event"></select>
+    <button id="rename" type="button" title="Event umbenennen" aria-label="Event umbenennen">✎</button>
+  </div>
   <div class="tabs">
     <button data-f="open" class="on">Offen</button>
     <button data-f="played">Gespielt</button>
@@ -70,10 +77,43 @@ async function rpc(fn, body) {
 function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function hhmm(d) { return new Date(d).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }); }
 
+let events = [], current = null;
+const sel = document.getElementById("event");
+
+// Partytag = 07:00 bis 07:00 Uhr (Berliner Zeit)
+function todayEvent() {
+  const d = new Date(Date.now() - 7 * 3600 * 1000);
+  return d.toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+}
+function fmtDate(d) { const [y, m, t] = d.split("-"); return t + "." + m + "." + y; }
+
+function renderEvents() {
+  if (!current || !events.some(e => e.event_date === current)) {
+    const today = todayEvent();
+    const upcoming = events.filter(e => e.event_date >= today).sort((a, b) => a.event_date < b.event_date ? -1 : 1)[0];
+    current = (upcoming || events[0] || {}).event_date || null;
+  }
+  sel.innerHTML = events.map(e => {
+    const n = rows.filter(r => r.event_date === e.event_date).length;
+    return `<option value="${e.event_date}" ${e.event_date === current ? "selected" : ""}>${esc(e.name)} – ${fmtDate(e.event_date)} (${n})</option>`;
+  }).join("");
+}
+sel.onchange = () => { current = sel.value; render(); };
+
+document.getElementById("rename").onclick = async () => {
+  const ev = events.find(e => e.event_date === current); if (!ev) return;
+  const name = prompt("Neuer Name für das Event:", ev.name);
+  if (!name || !name.trim()) return;
+  try { await rpc("dj_rename_event", { token, d: current, new_name: name.trim() }); ev.name = name.trim(); render(); }
+  catch (x) { alert("Umbenennen fehlgeschlagen."); }
+};
+
 function render() {
-  const open = rows.filter(r => !r.played).length;
-  meta.textContent = open + " offen · " + (rows.length - open) + " gespielt";
-  const shown = rows.filter(r => filter === "all" || (filter === "open" ? !r.played : r.played));
+  renderEvents();
+  const evRows = rows.filter(r => r.event_date === current);
+  const open = evRows.filter(r => !r.played).length;
+  meta.textContent = open + " offen · " + (evRows.length - open) + " gespielt";
+  const shown = evRows.filter(r => filter === "all" || (filter === "open" ? !r.played : r.played));
   list.innerHTML = shown.map(r => `
     <li class="${r.played ? "played" : ""}">
       <input type="checkbox" data-id="${r.id}" ${r.played ? "checked" : ""} aria-label="Gespielt">
@@ -92,7 +132,7 @@ function render() {
 async function load() {
   if (busy) return;
   try {
-    rows = await rpc("dj_list", { token });
+    [rows, events] = await Promise.all([rpc("dj_list", { token }), rpc("dj_events", { token })]);
     render();
   } catch (e) {
     msg.style.display = "block"; msg.className = "msg bad";
