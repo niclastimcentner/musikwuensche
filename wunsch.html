@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Musikwünsche</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { --bg:#0b0b0c; --panel:#161718; --line:#2a2b2e; --text:#e9e9ea; --dim:#8b8d92; --acc:#2d9bff; }
+  body { margin: 0; font-family: "Helvetica Neue", Arial, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+  main { max-width: 480px; margin: 0 auto; padding: 20px 20px 48px; }
+  .lang { display: flex; justify-content: flex-end; gap: 4px; }
+  .lang button { background: var(--panel); border: 1px solid var(--line); border-radius: 3px; padding: 6px 10px; font-size: 12px; font-weight: 700; letter-spacing: .08em; cursor: pointer; color: var(--dim); }
+  .lang button.on { background: var(--acc); border-color: var(--acc); color: #fff; }
+  h1 { font-size: 38px; line-height: 1.05; margin: 14px 0 8px; letter-spacing: -0.01em; }
+  p.sub { margin: 0 0 28px; color: var(--dim); font-size: 16px; }
+  .eq { display: flex; gap: 3px; align-items: flex-end; height: 18px; margin-top: 28px; }
+  .eq i { width: 4px; background: var(--acc); border-radius: 1px; animation: eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -.3s } .eq i:nth-child(3) { animation-delay: -.6s } .eq i:nth-child(4) { animation-delay: -.15s } .eq i:nth-child(5) { animation-delay: -.45s }
+  @keyframes eq { 0%,100% { height: 25% } 50% { height: 100% } }
+  @media (prefers-reduced-motion: reduce) { .eq i { animation: none; height: 60%; } }
+  label { display: block; font-weight: 700; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #fff; margin: 20px 0 6px; }
+  label .opt { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--dim); }
+  input, textarea { width: 100%; font: inherit; font-size: 17px; padding: 14px; border: 1px solid #fff; border-radius: 3px; background: #fff; color: #000; }
+  textarea { min-height: 90px; resize: vertical; }
+  input:focus, textarea:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px rgba(45,155,255,.25); }
+  .hp { position: absolute; left: -9999px; }
+  button.send { width: 100%; margin-top: 28px; padding: 16px; font-size: 15px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; background: var(--acc); color: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+  button.send:disabled { opacity: .5; }
+  .err { color: #ff5a4f; margin-top: 12px; font-size: 14px; min-height: 1em; }
+  .done { display: none; text-align: center; margin-top: 64px; }
+  .done .big { font-size: 64px; color: var(--acc); }
+  .done button.send { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<main>
+  <div class="lang">
+    <button type="button" data-l="de" class="on">DE</button>
+    <button type="button" data-l="en">EN</button>
+  </div>
+
+  <form id="f" novalidate>
+    <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <h1 data-t="title"></h1>
+    <p class="sub" data-t="sub"></p>
+
+    <label for="song"><span data-t="song"></span> *</label>
+    <input id="song" name="song" maxlength="200" required autocomplete="off">
+
+    <label for="artist"><span data-t="artist"></span> *</label>
+    <input id="artist" name="artist" maxlength="200" required autocomplete="off">
+
+    <label for="note"><span data-t="note"></span> <span class="opt" data-t="optional"></span></label>
+    <textarea id="note" name="note" maxlength="500"></textarea>
+
+    <input class="hp" id="website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+    <button class="send" id="send" type="submit" data-t="send"></button>
+    <div class="err" id="err"></div>
+  </form>
+
+  <div class="done" id="done">
+    <div class="big">✓</div>
+    <h1 data-t="thanks"></h1>
+    <p class="sub" data-t="thanksSub"></p>
+    <button class="send" id="again" type="button" data-t="again"></button>
+  </div>
+</main>
+
+<script>
+const SUPABASE_URL = "https://defcfwoxjspomkrfarpd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_DFW0nw2uSWbRvTqVZkz-Xw_wSHDvk7k";
+
+const T = {
+  de: { title: "Musikwünsche?", sub: "Sag uns, was du hören willst.", song: "Song", artist: "Künstler / Band",
+        note: "Anmerkung", optional: "(optional)", send: "Wunsch abschicken", sending: "Wird gesendet …",
+        missing: "Bitte Song und Künstler ausfüllen.", fail: "Hat nicht geklappt. Bitte nochmal versuchen.",
+        thanks: "Danke!", thanksSub: "Dein Wunsch ist beim DJ angekommen.", again: "Noch ein Wunsch" },
+  en: { title: "Song requests?", sub: "Tell us what you want to hear.", song: "Song", artist: "Artist / Band",
+        note: "Note", optional: "(optional)", send: "Send request", sending: "Sending …",
+        missing: "Please fill in song and artist.", fail: "Something went wrong. Please try again.",
+        thanks: "Thanks!", thanksSub: "Your request reached the DJ.", again: "Another request" }
+};
+let lang = "de";
+try { if (localStorage.getItem("lang") === "en") lang = "en"; } catch (e) {}
+
+function render() {
+  document.documentElement.lang = lang;
+  document.querySelectorAll("[data-t]").forEach(el => el.textContent = T[lang][el.dataset.t]);
+  document.querySelectorAll(".lang button").forEach(b => b.classList.toggle("on", b.dataset.l === lang));
+  document.title = T[lang].title;
+}
+document.querySelectorAll(".lang button").forEach(b => b.onclick = () => {
+  lang = b.dataset.l; try { localStorage.setItem("lang", lang); } catch (e) {} render();
+});
+render();
+
+const f = document.getElementById("f"), send = document.getElementById("send"), err = document.getElementById("err");
+f.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  err.textContent = "";
+  const song = f.song.value.trim(), artist = f.artist.value.trim(), note = f.note.value.trim();
+  if (f.website.value) return; // Spam-Bot
+  if (!song || !artist) { err.textContent = T[lang].missing; return; }
+  send.disabled = true; send.textContent = T[lang].sending;
+  try {
+    const r = await fetch(SUPABASE_URL + "/rest/v1/requests", {
+      method: "POST",
+      headers: { "apikey": SUPABASE_KEY, "Content-Type": "application/json", "Prefer": "return=minimal" },
+      body: JSON.stringify({ song, artist, note: note || null })
+    });
+    if (!r.ok) throw new Error(r.status);
+    f.reset(); f.style.display = "none"; document.getElementById("done").style.display = "block";
+  } catch (x) {
+    err.textContent = T[lang].fail;
+  } finally {
+    send.disabled = false; send.textContent = T[lang].send;
+  }
+});
+document.getElementById("again").onclick = () => {
+  document.getElementById("done").style.display = "none"; f.style.display = "block"; f.song.focus();
+};
+</script>
+</body>
+</html>
