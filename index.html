@@ -32,6 +32,20 @@
   .done { display: none; text-align: center; margin-top: 64px; }
   .done .big { font-size: 64px; color: var(--acc); }
   .done button.send { background: var(--panel); color: var(--text); border: 1px solid var(--line); }
+  .search { position: relative; }
+  .search input { padding-left: 44px; }
+  .search svg { position: absolute; left: 14px; top: 50%; width: 20px; height: 20px; transform: translateY(-50%); color: #666; pointer-events: none; }
+  .results { list-style: none; margin: 6px 0 0; padding: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+  .results:empty { display: none; }
+  .results li { display: flex; gap: 12px; align-items: center; padding: 10px 12px; cursor: pointer; border-top: 1px solid var(--line); }
+  .results li:first-child { border-top: 0; }
+  .results li:active, .results li:hover { background: #222428; }
+  .results img { width: 44px; height: 44px; border-radius: 2px; flex: none; background: #222; }
+  .results .t { font-size: 15px; font-weight: 600; color: var(--text); }
+  .results .a { font-size: 13px; color: var(--dim); margin-top: 2px; }
+  .results .hint { font-size: 13px; color: var(--dim); cursor: default; }
+  .or { display: flex; align-items: center; gap: 10px; margin: 22px 0 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+  .or::before, .or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 </style>
 </head>
 <body>
@@ -45,6 +59,14 @@
     <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     <h1 data-t="title"></h1>
     <p class="sub" data-t="sub"></p>
+
+    <label for="q"><span data-t="search"></span></label>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="q" type="search" autocomplete="off" enterkeyhint="search">
+    </div>
+    <ul class="results" id="results"></ul>
+    <div class="or" data-t="or"></div>
 
     <label for="song"><span data-t="song"></span> *</label>
     <input id="song" name="song" maxlength="200" required autocomplete="off">
@@ -77,11 +99,13 @@ const T = {
   de: { title: "Musikwünsche?", sub: "Sag uns, was du hören willst.", song: "Song", artist: "Künstler / Band",
         note: "Anmerkung", optional: "(optional)", send: "Wunsch abschicken", sending: "Wird gesendet …",
         missing: "Bitte Song und Künstler ausfüllen.", fail: "Hat nicht geklappt. Bitte nochmal versuchen.",
-        thanks: "Danke!", thanksSub: "Dein Wunsch ist beim DJ angekommen.", again: "Noch ein Wunsch" },
+        thanks: "Danke!", thanksSub: "Dein Wunsch ist beim DJ angekommen.", again: "Noch ein Wunsch",
+        search: "Song suchen", searchPh: "z. B. Mr. Brightside", or: "oder selbst eintragen", none: "Nichts gefunden – trag den Song einfach unten ein." },
   en: { title: "Song requests?", sub: "Tell us what you want to hear.", song: "Song", artist: "Artist / Band",
         note: "Note", optional: "(optional)", send: "Send request", sending: "Sending …",
         missing: "Please fill in song and artist.", fail: "Something went wrong. Please try again.",
-        thanks: "Thanks!", thanksSub: "Your request reached the DJ.", again: "Another request" }
+        thanks: "Thanks!", thanksSub: "Your request reached the DJ.", again: "Another request",
+        search: "Search song", searchPh: "e.g. Mr. Brightside", or: "or type it in", none: "Nothing found – just type the song below." }
 };
 let lang = "de";
 try { if (localStorage.getItem("lang") === "en") lang = "en"; } catch (e) {}
@@ -91,6 +115,7 @@ function render() {
   document.querySelectorAll("[data-t]").forEach(el => el.textContent = T[lang][el.dataset.t]);
   document.querySelectorAll(".lang button").forEach(b => b.classList.toggle("on", b.dataset.l === lang));
   document.title = T[lang].title;
+  document.getElementById("q").placeholder = T[lang].searchPh;
 }
 document.querySelectorAll(".lang button").forEach(b => b.onclick = () => {
   lang = b.dataset.l; try { localStorage.setItem("lang", lang); } catch (e) {} render();
@@ -122,6 +147,45 @@ f.addEventListener("submit", async (e) => {
 document.getElementById("again").onclick = () => {
   document.getElementById("done").style.display = "none"; f.style.display = "block"; f.song.focus();
 };
+// Song-Suche über die öffentliche Apple-Music-Suche (kein Account nötig)
+const q = document.getElementById("q"), results = document.getElementById("results");
+let timer, seq = 0;
+function itunes(term) {
+  return new Promise((resolve, reject) => {
+    const cb = "itcb" + (++seq), sc = document.createElement("script");
+    const done = () => { delete window[cb]; sc.remove(); };
+    window[cb] = (data) => { done(); resolve(data.results || []); };
+    sc.onerror = () => { done(); reject(); };
+    sc.src = "https://itunes.apple.com/search?entity=song&limit=6&country=DE&term=" + encodeURIComponent(term) + "&callback=" + cb;
+    document.head.appendChild(sc);
+    setTimeout(() => { if (window[cb]) { window[cb] = () => {}; reject(); } }, 6000);
+  });
+}
+q.addEventListener("input", () => {
+  clearTimeout(timer);
+  const term = q.value.trim();
+  if (term.length < 2) { results.innerHTML = ""; return; }
+  timer = setTimeout(async () => {
+    const mine = term;
+    try {
+      const list = await itunes(term);
+      if (q.value.trim() !== mine) return;
+      results.innerHTML = list.length ? list.map((t, i) => `
+        <li data-i="${i}"><img src="${(t.artworkUrl60 || "").replace(/"/g, "")}" alt="" loading="lazy">
+          <div><div class="t">${esc(t.trackName)}</div><div class="a">${esc(t.artistName)}</div></div></li>`).join("")
+        : `<li class="hint">${T[lang].none}</li>`;
+      results.onclick = (e) => {
+        const li = e.target.closest("li[data-i]"); if (!li) return;
+        const t = list[li.dataset.i];
+        f.song.value = t.trackName; f.artist.value = t.artistName;
+        results.innerHTML = ""; q.value = ""; err.textContent = "";
+        document.getElementById("send").scrollIntoView({ behavior: "smooth", block: "center" });
+      };
+    } catch (x) { results.innerHTML = ""; }
+  }, 300);
+});
+q.addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
+function esc(s) { return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 </script>
 </body>
 </html>
