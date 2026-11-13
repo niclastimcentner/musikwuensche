@@ -32,6 +32,8 @@
   input[type=checkbox]:checked::after { opacity: 1; }
   .song { font-size: 15px; font-weight: 600; color: var(--text); }
   .artist { font-size: 13px; color: var(--dim); margin-top: 2px; }
+  .count { display: inline-block; min-width: 30px; margin-right: 8px; padding: 1px 6px; border-radius: 3px; background: var(--acc); color: #fff; font-size: 12px; font-weight: 800; text-align: center; vertical-align: 2px; }
+  li.played .count { background: #3a3c41; color: #9a9ca1; }
   .note { font-size: 12px; color: var(--acc); margin-top: 4px; }
   .time { font-size: 12px; color: var(--dim); text-align: right; font-variant-numeric: tabular-nums; }
   .time small { display: block; color: #5d5f64; font-size: 10px; }
@@ -166,21 +168,43 @@ document.getElementById("rename").onclick = async () => {
   catch (x) { alert("Umbenennen fehlgeschlagen."); }
 };
 
+// Gleiche Songs zusammenfassen (Groß-/Kleinschreibung, Akzente, Klammern, "feat." egal)
+function songKey(t) {
+  return String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\(.*?\)|\[.*?\]/g, " ").replace(/\b(feat|ft)\b.*$/, " ").replace(/[^a-z0-9]+/g, "");
+}
+function groupRows(list) {
+  const map = new Map();
+  for (const r of list) {
+    const k = songKey(r.song) + (r.played ? "|p" : "|o");
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(r);
+  }
+  return [...map.values()].map(g => {
+    g.sort((x, y) => x.created_at < y.created_at ? -1 : 1);
+    const last = g[g.length - 1];
+    return { ids: g.map(r => r.id), song: g[0].song, artist: g[0].artist, played: g[0].played,
+      notes: g.map(r => r.note).filter(Boolean), count: g.length,
+      created_at: last.created_at, played_at: g.map(r => r.played_at).filter(Boolean).sort().pop() };
+  }).sort((x, y) => (y.count - x.count) || (x.created_at < y.created_at ? 1 : -1));
+}
+
 function render() {
   renderEvents();
   const evRows = rows.filter(r => r.event_date === current);
-  const open = evRows.filter(r => !r.played).length;
-  meta.textContent = open + " offen · " + (evRows.length - open) + " gespielt";
-  const shown = evRows.filter(r => filter === "all" || (filter === "open" ? !r.played : r.played));
-  list.innerHTML = shown.map(r => `
-    <li class="${r.played ? "played" : ""}">
-      <input type="checkbox" data-id="${r.id}" ${r.played ? "checked" : ""} aria-label="Gespielt">
+  const all = groupRows(evRows);
+  const open = all.filter(g => !g.played).length;
+  meta.textContent = open + " offen · " + (all.length - open) + " gespielt";
+  const shown = all.filter(g => filter === "all" || (filter === "open" ? !g.played : g.played));
+  list.innerHTML = shown.map(g => `
+    <li class="${g.played ? "played" : ""}">
+      <input type="checkbox" data-ids="${g.ids.join(",")}" ${g.played ? "checked" : ""} aria-label="Gespielt">
       <div class="txt">
-        <div class="song">${esc(r.song)}</div>
-        <div class="artist">${esc(r.artist)}</div>
-        ${r.note ? `<div class="note">${esc(r.note)}</div>` : ""}
+        <div class="song">${g.count > 1 ? `<span class="count">${g.count}×</span>` : ""}${esc(g.song)}</div>
+        <div class="artist">${esc(g.artist)}</div>
+        ${g.notes.map(n => `<div class="note">${esc(n)}</div>`).join("")}
       </div>
-      <div class="time">${hhmm(r.created_at)}${r.played && r.played_at && hhmm(r.played_at) !== hhmm(r.created_at) ? `<small title="Gespielt um">gespielt ${hhmm(r.played_at)}</small>` : ""}</div>
+      <div class="time">${hhmm(g.created_at)}${g.played && g.played_at && hhmm(g.played_at) !== hhmm(g.created_at) ? `<small title="Gespielt um">gespielt ${hhmm(g.played_at)}</small>` : ""}</div>
     </li>`).join("");
   document.querySelector(".cols").style.display = shown.length ? "" : "none";
   msg.className = "msg";
@@ -201,12 +225,13 @@ async function load() {
 
 list.addEventListener("change", async (e) => {
   if (e.target.type !== "checkbox") return;
-  const id = Number(e.target.dataset.id), played = e.target.checked;
-  const row = rows.find(r => r.id === id);
+  const ids = e.target.dataset.ids.split(",").map(Number), played = e.target.checked;
+  const group = rows.filter(r => ids.includes(r.id));
   busy = true;
-  row.played = played; row.played_at = played ? new Date().toISOString() : null; render();
-  try { await rpc("dj_set_played", { token, request_id: id, is_played: played }); }
-  catch (x) { row.played = !played; render(); alert("Speichern fehlgeschlagen."); }
+  group.forEach(r => { r.played = played; r.played_at = played ? new Date().toISOString() : null; });
+  render();
+  try { await Promise.all(ids.map(id => rpc("dj_set_played", { token, request_id: id, is_played: played }))); }
+  catch (x) { group.forEach(r => r.played = !played); render(); alert("Speichern fehlgeschlagen."); }
   busy = false;
 });
 
