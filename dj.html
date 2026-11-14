@@ -44,6 +44,8 @@
   .time .toq { display: block; margin-top: 6px; margin-left: auto; padding: 6px 8px; border: 1px solid var(--acc); border-radius: 3px; background: transparent; color: var(--acc); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; cursor: pointer; }
   .moves .toopen { width: auto; padding: 0 9px; border-color: var(--acc); background: transparent; color: var(--acc); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
   .moves .trash { color: #ff5a4f; display: grid; place-items: center; }
+  .year { color: var(--acc); font-weight: 600; font-variant-numeric: tabular-nums; }
+  li.played .year { color: #5d5f64; }
   .count { display: inline-block; min-width: 30px; margin-right: 8px; padding: 1px 6px; border-radius: 3px; background: var(--acc); color: #fff; font-size: 12px; font-weight: 800; text-align: center; vertical-align: 2px; }
   li.played .count { background: #3a3c41; color: #9a9ca1; }
   .note { font-size: 12px; color: var(--acc); margin-top: 4px; }
@@ -220,6 +222,50 @@ function queueGroups(evRows) {
 
 const TRASH = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
 
+// Erscheinungsjahr über die Apple-Music-Suche nachschlagen (gemerkt im Browser)
+let years = {};
+try { years = JSON.parse(localStorage.getItem("years") || "{}"); } catch (e) {}
+const yearQueue = [], yearPending = new Set();
+let yearSeq = 0, yearRunning = false;
+function yearKey(song, artist) { return songKey(song) + "|" + songKey(artist).slice(0, 12); }
+function yearOf(song, artist) {
+  const k = yearKey(song, artist);
+  if (k in years) return years[k];
+  if (!yearPending.has(k)) { yearPending.add(k); yearQueue.push({ k, song, artist }); runYears(); }
+  return null;
+}
+function itunesYear(song, artist) {
+  return new Promise((resolve) => {
+    const cb = "yr" + (++yearSeq), sc = document.createElement("script");
+    const done = (v) => { window[cb] = () => {}; sc.remove(); resolve(v); };
+    window[cb] = (data) => {
+      const a = songKey(artist).slice(0, 6), t = songKey(song).slice(0, 8);
+      const hits = (data.results || []).filter(r => songKey(r.artistName).includes(a) || songKey(r.trackName).includes(t));
+      const ys = (hits.length ? hits : (data.results || []).slice(0, 1)).map(r => parseInt((r.releaseDate || "").slice(0, 4))).filter(Boolean);
+      done(ys.length ? Math.min(...ys) : 0);
+    };
+    sc.onerror = () => done(undefined);
+    setTimeout(() => done(undefined), 6000);
+    sc.src = "https://itunes.apple.com/search?entity=song&limit=10&country=DE&term=" + encodeURIComponent(song + " " + artist) + "&callback=" + cb;
+    document.head.appendChild(sc);
+  });
+}
+async function runYears() {
+  if (yearRunning) return; yearRunning = true;
+  while (yearQueue.length) {
+    const { k, song, artist } = yearQueue.shift();
+    const y = await itunesYear(song, artist);
+    if (y !== undefined) { years[k] = y; try { localStorage.setItem("years", JSON.stringify(years)); } catch (e) {} }
+    else yearPending.delete(k);
+    document.querySelectorAll(`[data-yk="${CSS.escape(k)}"]`).forEach(el => { el.textContent = y ? " · " + y : ""; });
+    await new Promise(r => setTimeout(r, 1200));
+  }
+  yearRunning = false;
+}
+function yearSpan(song, artist) {
+  const y = yearOf(song, artist);
+  return `<span class="year" data-yk="${esc(yearKey(song, artist))}">${y ? " · " + y : ""}</span>`;
+}
 function render() {
   renderEvents();
   const evRows = rows.filter(r => r.event_date === current);
@@ -237,7 +283,7 @@ function render() {
         <input type="checkbox" data-ids="${g.ids.join(",")}" ${g.played ? "checked" : ""} aria-label="Gespielt">
         <div class="txt">
           <div class="song"><span class="num">${i + 1}.</span>${g.count > 1 ? `<span class="count">${g.count}×</span>` : ""}${esc(g.song)}</div>
-          <div class="artist">${esc(g.artist)}</div>
+          <div class="artist">${esc(g.artist)}${yearSpan(g.song, g.artist)}</div>
           ${g.notes.map(n => `<div class="note">${esc(n)}</div>`).join("")}
         </div>
         <div class="moves">
@@ -256,7 +302,7 @@ function render() {
       <input type="checkbox" data-ids="${g.ids.join(",")}" ${g.played ? "checked" : ""} aria-label="Gespielt">
       <div class="txt">
         <div class="song">${g.count > 1 ? `<span class="count">${g.count}×</span>` : ""}${esc(g.song)}</div>
-        <div class="artist">${esc(g.artist)}</div>
+        <div class="artist">${esc(g.artist)}${yearSpan(g.song, g.artist)}</div>
         ${g.notes.map(n => `<div class="note">${esc(n)}</div>`).join("")}
         ${g.fromQueue ? `<div class="note">Set List</div>` : ""}
       </div>
