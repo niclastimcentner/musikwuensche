@@ -32,6 +32,14 @@
   input[type=checkbox]:checked::after { opacity: 1; }
   .song { font-size: 15px; font-weight: 600; color: var(--text); }
   .artist { font-size: 13px; color: var(--dim); margin-top: 2px; }
+  li.q { grid-template-columns: 34px 1fr auto; }
+  li.q.played .song { text-decoration: line-through; }
+  li.q.played .artist { text-decoration: line-through; }
+  .num { display: inline-block; min-width: 26px; margin-right: 6px; color: var(--acc); font-weight: 800; font-variant-numeric: tabular-nums; }
+  li.q.played .num { color: #5d5f64; }
+  .moves { display: flex; gap: 4px; }
+  .moves button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--text); font-size: 16px; cursor: pointer; }
+  .moves button:disabled { opacity: .25; cursor: default; }
   .count { display: inline-block; min-width: 30px; margin-right: 8px; padding: 1px 6px; border-radius: 3px; background: var(--acc); color: #fff; font-size: 12px; font-weight: 800; text-align: center; vertical-align: 2px; }
   li.played .count { background: #3a3c41; color: #9a9ca1; }
   .note { font-size: 12px; color: var(--acc); margin-top: 4px; }
@@ -80,7 +88,7 @@
   <div class="tabs">
     <button data-f="open" class="on">Offen</button>
     <button data-f="played">Gespielt</button>
-    <button data-f="all">Alle</button>
+    <button data-f="queue">Set List</button>
   </div>
   <div class="cols"><span>✓</span><span>Titel / Künstler</span><span title="Wann der Wunsch reinkam">Wunsch</span></div>
   <ul id="list"></ul>
@@ -189,14 +197,44 @@ function groupRows(list) {
   }).sort((x, y) => (y.count - x.count) || (x.created_at < y.created_at ? 1 : -1));
 }
 
+const isQueue = r => /warteschlange/i.test(r.note || "");
+function queueRows(evRows) {
+  return evRows.filter(isQueue).sort((x, y) =>
+    ((x.queue_pos ?? 1e9) - (y.queue_pos ?? 1e9)) || (x.created_at < y.created_at ? -1 : 1));
+}
+
 function render() {
   renderEvents();
   const evRows = rows.filter(r => r.event_date === current);
-  const all = groupRows(evRows);
+  const all = groupRows(evRows.filter(r => !isQueue(r)));
+  const queue = queueRows(evRows);
   const open = all.filter(g => !g.played).length;
-  meta.textContent = open + " offen · " + (all.length - open) + " gespielt";
-  const shown = all.filter(g => filter === "all" || (filter === "open" ? !g.played : g.played));
-  list.innerHTML = shown.map(g => `
+  meta.textContent = open + " offen · " + (all.length - open) + " gespielt · " + queue.length + " Set List";
+  const cols = document.querySelector(".cols");
+  let count;
+  if (filter === "queue") {
+    count = queue.length;
+    cols.innerHTML = "<span>✓</span><span>Set List</span><span>↕</span>";
+    list.innerHTML = queue.map((r, i) => {
+      const note = (r.note || "").replace(/warteschlange/ig, "").replace(/^[\s,.:;–-]+|[\s,.:;–-]+$/g, "");
+      return `
+      <li class="q ${r.played ? "played" : ""}">
+        <input type="checkbox" data-ids="${r.id}" ${r.played ? "checked" : ""} aria-label="Gespielt">
+        <div class="txt">
+          <div class="song"><span class="num">${i + 1}.</span>${esc(r.song)}</div>
+          <div class="artist">${esc(r.artist)}</div>
+          ${note ? `<div class="note">${esc(note)}</div>` : ""}
+        </div>
+        <div class="moves">
+          <button type="button" data-move="-1" data-id="${r.id}" aria-label="Nach oben" ${i === 0 ? "disabled" : ""}>▲</button>
+          <button type="button" data-move="1" data-id="${r.id}" aria-label="Nach unten" ${i === queue.length - 1 ? "disabled" : ""}>▼</button>
+        </div>
+      </li>`; }).join("");
+  } else {
+    const shown = all.filter(g => filter === "open" ? !g.played : g.played);
+    count = shown.length;
+    cols.innerHTML = '<span>✓</span><span>Titel / Künstler</span><span title="Wann der Wunsch reinkam">Wunsch</span>';
+    list.innerHTML = shown.map(g => `
     <li class="${g.played ? "played" : ""}">
       <input type="checkbox" data-ids="${g.ids.join(",")}" ${g.played ? "checked" : ""} aria-label="Gespielt">
       <div class="txt">
@@ -206,11 +244,26 @@ function render() {
       </div>
       <div class="time">${hhmm(g.created_at)}${g.played && g.played_at && hhmm(g.played_at) !== hhmm(g.created_at) ? `<small title="Gespielt um">gespielt ${hhmm(g.played_at)}</small>` : ""}</div>
     </li>`).join("");
-  document.querySelector(".cols").style.display = shown.length ? "" : "none";
+  }
+  cols.style.display = count ? "" : "none";
   msg.className = "msg";
-  msg.textContent = shown.length ? "" : (filter === "played" ? "Noch nichts gespielt." : "Keine Wünsche.");
-  msg.style.display = shown.length ? "none" : "block";
+  msg.textContent = count ? "" : (filter === "played" ? "Noch nichts gespielt." : filter === "queue" ? "Noch keine Songs in der Set List. (Wunsch mit Anmerkung „Warteschlange“ abschicken)" : "Keine Wünsche.");
+  msg.style.display = count ? "none" : "block";
 }
+
+list.addEventListener("click", async (e) => {
+  const btn = e.target.closest("button[data-move]"); if (!btn) return;
+  const queue = queueRows(rows.filter(r => r.event_date === current));
+  const i = queue.findIndex(r => r.id === Number(btn.dataset.id)), j = i + Number(btn.dataset.move);
+  if (i < 0 || j < 0 || j >= queue.length) return;
+  [queue[i], queue[j]] = [queue[j], queue[i]];
+  const before = queue.map(r => r.queue_pos);
+  queue.forEach((r, k) => r.queue_pos = k + 1);
+  busy = true; render();
+  try { await rpc("dj_set_order", { token, ids: queue.map(r => r.id) }); }
+  catch (x) { queue.forEach((r, k) => r.queue_pos = before[k]); render(); alert("Reihenfolge konnte nicht gespeichert werden."); }
+  busy = false;
+});
 
 async function load() {
   if (busy) return;
