@@ -40,6 +40,9 @@
   .moves { display: flex; gap: 4px; }
   .moves button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 3px; background: var(--panel); color: var(--text); font-size: 16px; cursor: pointer; }
   .moves button:disabled { opacity: .25; cursor: default; }
+  li.o { grid-template-columns: 34px 1fr auto; }
+  .time .toq { display: block; margin-top: 6px; margin-left: auto; padding: 6px 8px; border: 1px solid var(--acc); border-radius: 3px; background: transparent; color: var(--acc); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; cursor: pointer; }
+  .moves .trash { color: #ff5a4f; display: grid; place-items: center; }
   .count { display: inline-block; min-width: 30px; margin-right: 8px; padding: 1px 6px; border-radius: 3px; background: var(--acc); color: #fff; font-size: 12px; font-weight: 800; text-align: center; vertical-align: 2px; }
   li.played .count { background: #3a3c41; color: #9a9ca1; }
   .note { font-size: 12px; color: var(--acc); margin-top: 4px; }
@@ -192,22 +195,35 @@ function groupRows(list) {
     g.sort((x, y) => x.created_at < y.created_at ? -1 : 1);
     const last = g[g.length - 1];
     return { ids: g.map(r => r.id), song: g[0].song, artist: g[0].artist, played: g[0].played,
-      notes: g.map(r => r.note).filter(Boolean), count: g.length,
+      notes: g.map(r => r.note).filter(n => n && !/warteschlange/i.test(n)), count: g.length, fromQueue: g.some(r => r.queue_state === "done"),
       created_at: last.created_at, played_at: g.map(r => r.played_at).filter(Boolean).sort().pop() };
   }).sort((x, y) => (y.count - x.count) || (x.created_at < y.created_at ? 1 : -1));
 }
 
-const isQueue = r => /warteschlange/i.test(r.note || "");
-function queueRows(evRows) {
-  return evRows.filter(isQueue).sort((x, y) =>
-    ((x.queue_pos ?? 1e9) - (y.queue_pos ?? 1e9)) || (x.created_at < y.created_at ? -1 : 1));
+const isQueue = r => r.queue_state === "queue";
+// Set List: gleiche Songs zusammenfassen, sortiert nach Position
+function queueGroups(evRows) {
+  const map = new Map();
+  for (const r of evRows.filter(isQueue)) {
+    const k = songKey(r.song) + (r.played ? "|p" : "|o");
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(r);
+  }
+  return [...map.values()].map(g => {
+    g.sort((x, y) => x.created_at < y.created_at ? -1 : 1);
+    return { rows: g, ids: g.map(r => r.id), song: g[0].song, artist: g[0].artist, played: g[0].played, count: g.length,
+      notes: g.map(r => (r.note || "").replace(/warteschlange/ig, "").replace(/^[\s,.:;–-]+|[\s,.:;–-]+$/g, "")).filter(Boolean),
+      pos: Math.min(...g.map(r => r.queue_pos ?? 1e9)), created_at: g[0].created_at };
+  }).sort((x, y) => (x.pos - y.pos) || (x.created_at < y.created_at ? -1 : 1));
 }
+
+const TRASH = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M6 6l1 14h10l1-14"/></svg>';
 
 function render() {
   renderEvents();
   const evRows = rows.filter(r => r.event_date === current);
   const all = groupRows(evRows.filter(r => !isQueue(r)));
-  const queue = queueRows(evRows);
+  const queue = queueGroups(evRows);
   const open = all.filter(g => !g.played).length;
   meta.textContent = open + " offen · " + (all.length - open) + " gespielt · " + queue.length + " Set List";
   const cols = document.querySelector(".cols");
@@ -215,53 +231,75 @@ function render() {
   if (filter === "queue") {
     count = queue.length;
     cols.innerHTML = "<span>✓</span><span>Set List</span><span>↕</span>";
-    list.innerHTML = queue.map((r, i) => {
-      const note = (r.note || "").replace(/warteschlange/ig, "").replace(/^[\s,.:;–-]+|[\s,.:;–-]+$/g, "");
-      return `
-      <li class="q ${r.played ? "played" : ""}">
-        <input type="checkbox" data-ids="${r.id}" ${r.played ? "checked" : ""} aria-label="Gespielt">
+    list.innerHTML = queue.map((g, i) => `
+      <li class="q ${g.played ? "played" : ""}">
+        <input type="checkbox" data-ids="${g.ids.join(",")}" ${g.played ? "checked" : ""} aria-label="Gespielt">
         <div class="txt">
-          <div class="song"><span class="num">${i + 1}.</span>${esc(r.song)}</div>
-          <div class="artist">${esc(r.artist)}</div>
-          ${note ? `<div class="note">${esc(note)}</div>` : ""}
+          <div class="song"><span class="num">${i + 1}.</span>${g.count > 1 ? `<span class="count">${g.count}×</span>` : ""}${esc(g.song)}</div>
+          <div class="artist">${esc(g.artist)}</div>
+          ${g.notes.map(n => `<div class="note">${esc(n)}</div>`).join("")}
         </div>
         <div class="moves">
-          <button type="button" data-move="-1" data-id="${r.id}" aria-label="Nach oben" ${i === 0 ? "disabled" : ""}>▲</button>
-          <button type="button" data-move="1" data-id="${r.id}" aria-label="Nach unten" ${i === queue.length - 1 ? "disabled" : ""}>▼</button>
+          ${g.played ? `<button type="button" class="trash" data-done="${g.ids.join(",")}" aria-label="Aus Set List entfernen" title="Nach Gespielt verschieben">${TRASH}</button>` : ""}
+          <button type="button" data-move="-1" data-i="${i}" aria-label="Nach oben" ${i === 0 ? "disabled" : ""}>▲</button>
+          <button type="button" data-move="1" data-i="${i}" aria-label="Nach unten" ${i === queue.length - 1 ? "disabled" : ""}>▼</button>
         </div>
-      </li>`; }).join("");
+      </li>`).join("");
   } else {
     const shown = all.filter(g => filter === "open" ? !g.played : g.played);
     count = shown.length;
     cols.innerHTML = '<span>✓</span><span>Titel / Künstler</span><span title="Wann der Wunsch reinkam">Wunsch</span>';
     list.innerHTML = shown.map(g => `
-    <li class="${g.played ? "played" : ""}">
+    <li class="${g.played ? "played" : "o"}">
       <input type="checkbox" data-ids="${g.ids.join(",")}" ${g.played ? "checked" : ""} aria-label="Gespielt">
       <div class="txt">
         <div class="song">${g.count > 1 ? `<span class="count">${g.count}×</span>` : ""}${esc(g.song)}</div>
         <div class="artist">${esc(g.artist)}</div>
         ${g.notes.map(n => `<div class="note">${esc(n)}</div>`).join("")}
+        ${g.fromQueue ? `<div class="note">Set List</div>` : ""}
       </div>
-      <div class="time">${hhmm(g.created_at)}${g.played && g.played_at && hhmm(g.played_at) !== hhmm(g.created_at) ? `<small title="Gespielt um">gespielt ${hhmm(g.played_at)}</small>` : ""}</div>
+      <div class="time">${hhmm(g.created_at)}${g.played && g.played_at && hhmm(g.played_at) !== hhmm(g.created_at) ? `<small title="Gespielt um">gespielt ${hhmm(g.played_at)}</small>` : ""}
+        ${g.played ? "" : `<button type="button" class="toq" data-toq="${g.ids.join(",")}">+ Set List</button>`}</div>
     </li>`).join("");
   }
   cols.style.display = count ? "" : "none";
   msg.className = "msg";
-  msg.textContent = count ? "" : (filter === "played" ? "Noch nichts gespielt." : filter === "queue" ? "Noch keine Songs in der Set List. (Wunsch mit Anmerkung „Warteschlange“ abschicken)" : "Keine Wünsche.");
+  msg.textContent = count ? "" : (filter === "played" ? "Noch nichts gespielt." : filter === "queue" ? "Noch keine Songs in der Set List." : "Keine Wünsche.");
   msg.style.display = count ? "none" : "block";
 }
 
-list.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-move]"); if (!btn) return;
-  const queue = queueRows(rows.filter(r => r.event_date === current));
-  const i = queue.findIndex(r => r.id === Number(btn.dataset.id)), j = i + Number(btn.dataset.move);
-  if (i < 0 || j < 0 || j >= queue.length) return;
-  [queue[i], queue[j]] = [queue[j], queue[i]];
-  const before = queue.map(r => r.queue_pos);
-  queue.forEach((r, k) => r.queue_pos = k + 1);
+async function setQueue(ids, state) {
+  const group = rows.filter(r => ids.includes(r.id));
+  const backup = group.map(r => ({ ...r }));
+  if (state === "queue") {
+    const evRows = rows.filter(r => r.event_date === current);
+    const next = Math.max(0, ...evRows.map(r => r.queue_pos || 0)) + 1;
+    group.forEach(r => { r.queue_state = "queue"; r.queue_pos = next; r.played = false; r.played_at = null; });
+  } else {
+    group.forEach(r => { r.queue_state = "done"; r.played = true; r.played_at = r.played_at || new Date().toISOString(); });
+  }
   busy = true; render();
-  try { await rpc("dj_set_order", { token, ids: queue.map(r => r.id) }); }
-  catch (x) { queue.forEach((r, k) => r.queue_pos = before[k]); render(); alert("Reihenfolge konnte nicht gespeichert werden."); }
+  try { await rpc("dj_set_queue", { token, ids, state }); }
+  catch (x) { group.forEach((r, k) => Object.assign(r, backup[k])); render(); alert("Speichern fehlgeschlagen."); }
+  busy = false;
+}
+
+list.addEventListener("click", async (e) => {
+  const toq = e.target.closest("button[data-toq]");
+  if (toq) return setQueue(toq.dataset.toq.split(",").map(Number), "queue");
+  const done = e.target.closest("button[data-done]");
+  if (done) return setQueue(done.dataset.done.split(",").map(Number), "done");
+  const btn = e.target.closest("button[data-move]"); if (!btn) return;
+  const queue = queueGroups(rows.filter(r => r.event_date === current));
+  const i = Number(btn.dataset.i), j = i + Number(btn.dataset.move);
+  if (j < 0 || j >= queue.length) return;
+  [queue[i], queue[j]] = [queue[j], queue[i]];
+  const flat = queue.flatMap(g => g.rows);
+  const before = flat.map(r => r.queue_pos);
+  queue.forEach((g, k) => g.rows.forEach(r => r.queue_pos = k + 1));
+  busy = true; render();
+  try { await rpc("dj_set_order", { token, ids: flat.map(r => r.id) }); }
+  catch (x) { flat.forEach((r, k) => r.queue_pos = before[k]); render(); alert("Reihenfolge konnte nicht gespeichert werden."); }
   busy = false;
 });
 
