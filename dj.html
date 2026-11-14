@@ -42,6 +42,7 @@
   .moves button:disabled { opacity: .25; cursor: default; }
   li.o { grid-template-columns: 34px 1fr auto; }
   .time .toq { display: block; margin-top: 6px; margin-left: auto; padding: 6px 8px; border: 1px solid var(--acc); border-radius: 3px; background: transparent; color: var(--acc); font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; cursor: pointer; }
+  .moves .toopen { width: auto; padding: 0 9px; border-color: var(--acc); background: transparent; color: var(--acc); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
   .moves .trash { color: #ff5a4f; display: grid; place-items: center; }
   .count { display: inline-block; min-width: 30px; margin-right: 8px; padding: 1px 6px; border-radius: 3px; background: var(--acc); color: #fff; font-size: 12px; font-weight: 800; text-align: center; vertical-align: 2px; }
   li.played .count { background: #3a3c41; color: #9a9ca1; }
@@ -240,6 +241,7 @@ function render() {
           ${g.notes.map(n => `<div class="note">${esc(n)}</div>`).join("")}
         </div>
         <div class="moves">
+          ${g.played ? "" : `<button type="button" class="toopen" data-toopen="${g.ids.join(",")}" title="Zurück nach Offen">Offen</button>`}
           ${g.played ? `<button type="button" class="trash" data-done="${g.ids.join(",")}" aria-label="Aus Set List entfernen" title="Nach Gespielt verschieben">${TRASH}</button>` : ""}
           <button type="button" data-move="-1" data-i="${i}" aria-label="Nach oben" ${i === 0 ? "disabled" : ""}>▲</button>
           <button type="button" data-move="1" data-i="${i}" aria-label="Nach unten" ${i === queue.length - 1 ? "disabled" : ""}>▼</button>
@@ -273,8 +275,10 @@ async function setQueue(ids, state) {
   const backup = group.map(r => ({ ...r }));
   if (state === "queue") {
     const evRows = rows.filter(r => r.event_date === current);
-    const next = Math.max(0, ...evRows.map(r => r.queue_pos || 0)) + 1;
+    const next = Math.max(0, ...evRows.filter(isQueue).map(r => r.queue_pos || 0)) + 1;
     group.forEach(r => { r.queue_state = "queue"; r.queue_pos = next; r.played = false; r.played_at = null; });
+  } else if (state === "open") {
+    group.forEach(r => { r.queue_state = null; r.queue_pos = null; r.played = false; r.played_at = null; });
   } else {
     group.forEach(r => { r.queue_state = "done"; r.played = true; r.played_at = r.played_at || new Date().toISOString(); });
   }
@@ -287,6 +291,8 @@ async function setQueue(ids, state) {
 list.addEventListener("click", async (e) => {
   const toq = e.target.closest("button[data-toq]");
   if (toq) return setQueue(toq.dataset.toq.split(",").map(Number), "queue");
+  const toopen = e.target.closest("button[data-toopen]");
+  if (toopen) return setQueue(toopen.dataset.toopen.split(",").map(Number), "open");
   const done = e.target.closest("button[data-done]");
   if (done) return setQueue(done.dataset.done.split(",").map(Number), "done");
   const btn = e.target.closest("button[data-move]"); if (!btn) return;
